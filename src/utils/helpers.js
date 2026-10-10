@@ -2,15 +2,39 @@ import { PLANS } from "./constants";
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
 export const isActive = (a) => a.status === "ACTIVO";
-export const ageOf = (birth) =>
-  birth ? Math.floor((Date.now() - new Date(birth)) / 31557600000) : "-";
+export const ageOf = (birth) => {
+  if (!birth) return "-";
+  const birthday = new Date(`${birth}T00:00:00`);
+  if (Number.isNaN(birthday.getTime())) return "-";
+  const today = new Date();
+  let age = today.getFullYear() - birthday.getFullYear();
+  if (
+    today.getMonth() < birthday.getMonth() ||
+    (today.getMonth() === birthday.getMonth() &&
+      today.getDate() < birthday.getDate())
+  ) {
+    age -= 1;
+  }
+  return age < 0 ? "-" : age;
+};
 
-export const createAthlete = (form, id) => {
-  const n = PLANS[form.plan].sessions;
+const optionalNumber = (value) => {
+  if (value === "" || value == null) return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+};
+
+export const createAthlete = (form, id, plans = PLANS) => {
+  const n = plans[form.plan].sessions;
   return {
     id,
     name: form.name.trim(),
     birth: form.birth,
+    heightCm: optionalNumber(form.heightCm),
+    weightKg: optionalNumber(form.weightKg),
+    club: form.club?.trim() ?? "",
+    courtPosition: form.courtPosition?.trim() ?? "",
+    dominantFoot: form.dominantFoot ?? "",
     guardian: form.guardian,
     guardianNotApplicable: Boolean(form.guardianNotApplicable),
     phone: form.phone,
@@ -18,6 +42,7 @@ export const createAthlete = (form, id) => {
     status: "ACTIVO",
     payment: "PENDIENTE",
     paymentRecords: {},
+    recoveryCredits: 0,
     allocated: n,
     remaining: n,
   };
@@ -56,9 +81,11 @@ export const improvementVsFirst = (first, current) =>
   first && current ? ((first - current) / first) * 100 : null;
 
 const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
-export const dashboardMetrics = ({ athletes, sessions }, month) => {
+export const dashboardMetrics = ({ athletes, sessions, plans = PLANS }, month) => {
   const active = athletes.filter(isActive);
-  const monthly = active.filter((a) => a.plan === "MENSUAL_DUPLA");
+  const monthly = active.filter(
+    (athlete) => plans[athlete.plan]?.billingType === "monthly",
+  );
   const monthSessions = sessions.filter((s) => s.date.startsWith(month));
   const consumed = monthly.reduce((t, a) => t + a.allocated - a.remaining, 0);
   return {

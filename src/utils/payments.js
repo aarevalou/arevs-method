@@ -14,10 +14,17 @@ const formatMonth = (month) =>
   });
 
 const isChargeable = (session) =>
-  session.status === "PRESENTE" || session.status === "AUSENTE_SIN_AVISO";
+  session.sessionType !== "RECUPERACION" &&
+  session.block !== "RECUPERACION" &&
+  (session.status === "PRESENTE" || session.status === "AUSENTE_SIN_AVISO");
 
-export const getPaymentDetails = (athlete, sessions, currentMonth) => {
-  const plan = PLANS[athlete.plan];
+export const getPaymentDetails = (
+  athlete,
+  sessions,
+  currentMonth,
+  plans = PLANS,
+) => {
+  const plan = plans[athlete.plan] ?? PLANS[athlete.plan];
   const records = athlete.paymentRecords ?? {};
   const legacyPaid =
     athlete.payment === "AL_DIA" && Object.keys(records).length === 0;
@@ -26,7 +33,7 @@ export const getPaymentDetails = (athlete, sessions, currentMonth) => {
     .sort((first, second) => first.date.localeCompare(second.date));
   let charges;
 
-  if (athlete.plan === "MENSUAL_DUPLA") {
+  if (plan.billingType === "monthly") {
     const sessionsByMonth = new Map();
     athleteSessions.forEach((session) => {
       const month = session.date.slice(0, 7);
@@ -71,20 +78,30 @@ export const getPaymentDetails = (athlete, sessions, currentMonth) => {
       const record = records[charge.key];
       return {
         ...charge,
-        amount: Number.isFinite(record?.amount) ? record.amount : charge.amount,
+        amount:
+          !record?.paid && Number.isFinite(charge.amount)
+            ? charge.amount
+            : Number.isFinite(record?.amount)
+              ? record.amount
+              : charge.amount,
         paid: record ? Boolean(record.paid) : legacyPaid,
         paidAt: record?.paidAt ?? null,
       };
     }),
     unbilledSessions:
-      athlete.plan === "MENSUAL_DUPLA"
+      plan.billingType === "monthly"
         ? []
         : athleteSessions.filter((session) => !isChargeable(session)),
   };
 };
 
-export const syncPaymentRecords = (athlete, sessions, currentMonth) => {
-  const details = getPaymentDetails(athlete, sessions, currentMonth);
+export const syncPaymentRecords = (
+  athlete,
+  sessions,
+  currentMonth,
+  plans = PLANS,
+) => {
+  const details = getPaymentDetails(athlete, sessions, currentMonth, plans);
   const existingRecords = athlete.paymentRecords ?? {};
   const legacyPaid =
     athlete.payment === "AL_DIA" && Object.keys(existingRecords).length === 0;
@@ -99,7 +116,11 @@ export const syncPaymentRecords = (athlete, sessions, currentMonth) => {
         amount: charge.amount,
       };
       changed = true;
-    } else if (!Number.isFinite(paymentRecords[charge.key].amount)) {
+    } else if (
+      !Number.isFinite(paymentRecords[charge.key].amount) ||
+      (!paymentRecords[charge.key].paid &&
+        paymentRecords[charge.key].amount !== charge.amount)
+    ) {
       paymentRecords[charge.key] = {
         ...paymentRecords[charge.key],
         amount: charge.amount,
@@ -117,9 +138,14 @@ export const syncPaymentRecords = (athlete, sessions, currentMonth) => {
   return { ...athlete, payment, paymentRecords };
 };
 
-export const summarizePayments = (athletes, sessions, currentMonth) => {
+export const summarizePayments = (
+  athletes,
+  sessions,
+  currentMonth,
+  plans = PLANS,
+) => {
   const charges = athletes.flatMap((athlete) =>
-    getPaymentDetails(athlete, sessions, currentMonth).charges.map(
+    getPaymentDetails(athlete, sessions, currentMonth, plans).charges.map(
       (charge) => ({
         ...charge,
         athleteId: athlete.id,

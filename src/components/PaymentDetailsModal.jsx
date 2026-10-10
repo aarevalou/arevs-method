@@ -1,7 +1,8 @@
 import { useApp } from "../context/AppContext";
-import { ATTENDANCE, PAYMENT, PLANS } from "../utils/constants";
+import { ATTENDANCE, PAYMENT } from "../utils/constants";
 import { todayISO } from "../utils/helpers";
 import { getPaymentDetails } from "../utils/payments";
+import { getClosedAbsenceNotes } from "../utils/attendanceSummary";
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("es-CL", {
@@ -19,10 +20,18 @@ const formatDate = (date) =>
 
 export default function PaymentDetailsModal({ athlete, onClose }) {
   const { state, actions } = useApp();
+  const currentMonth = todayISO().slice(0, 7);
   const details = getPaymentDetails(
     athlete,
     state.sessions,
-    todayISO().slice(0, 7),
+    currentMonth,
+    state.plans,
+  );
+  const cycleNotes = getClosedAbsenceNotes(
+    athlete,
+    state.sessions,
+    state.plans,
+    currentMonth,
   );
   const totalDue = details.charges.reduce(
     (total, charge) => total + (charge.paid ? 0 : charge.amount),
@@ -52,7 +61,7 @@ export default function PaymentDetailsModal({ athlete, onClose }) {
               <h4 id="payment-detail-title">Detalle de pagos</h4>
               <div className="payment-modal-athlete">{athlete.name}</div>
               <div className="payment-modal-meta">
-                <span>{PLANS[athlete.plan].label}</span>
+                <span>{state.plans[athlete.plan]?.label ?? "Plan no disponible"}</span>
                 <span className="payment-modal-divider">·</span>
                 <span>{PAYMENT[athlete.payment]}</span>
               </div>
@@ -85,6 +94,14 @@ export default function PaymentDetailsModal({ athlete, onClose }) {
             </strong>
           </div>
 
+          {cycleNotes.length > 0 && (
+            <section className="payment-cycle-notes" aria-label="Resumen de inasistencias">
+              {cycleNotes.map((note) => (
+                <p key={note.key}>{note.message}</p>
+              ))}
+            </section>
+          )}
+
           <section className="payment-section">
             <div className="payment-table-container">
               <table className="payment-detail-table">
@@ -112,7 +129,7 @@ export default function PaymentDetailsModal({ athlete, onClose }) {
                               </span>
                             )}
                           </div>
-                          <span>{PLANS[athlete.plan].label}</span>
+                          <span>{state.plans[athlete.plan]?.label ?? "Plan no disponible"}</span>
                         </div>
                       </td>
                       <td>

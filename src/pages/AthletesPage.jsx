@@ -1,18 +1,29 @@
 import { useState } from "react";
 import { useApp } from "../context/AppContext";
 import { useForm } from "../hooks/useForm";
-import { EmptyState, PageHeader } from "../components/UI";
+import {
+  DeleteIcon,
+  EditIcon,
+  EmptyState,
+  PageHeader,
+} from "../components/UI";
+import DatePicker from "../components/DatePicker";
 import PaymentDetailsModal from "../components/PaymentDetailsModal";
-import { PAYMENT, PLANS } from "../utils/constants";
+import { PAYMENT } from "../utils/constants";
 import { ageOf } from "../utils/helpers";
 
 const BLANK = {
   name: "",
   birth: "",
+  heightCm: "",
+  weightKg: "",
+  club: "",
+  courtPosition: "",
+  dominantFoot: "",
   guardian: "",
   guardianNotApplicable: false,
   phone: "",
-  plan: "MENSUAL_DUPLA",
+  plan: "",
 };
 
 const formatChileanWhatsApp = (phone) => {
@@ -30,7 +41,7 @@ export default function AthletesPage({
   onPaymentFilterChange,
 }) {
   const { state, actions } = useApp();
-  const { values, bind, reset } = useForm(BLANK);
+  const { values, bind, reset, setField } = useForm(BLANK);
 
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -60,7 +71,7 @@ export default function AthletesPage({
   );
 
   const openModal = () => {
-    reset();
+    reset({ plan: Object.keys(state.plans)[0] ?? "" });
     setShowModal(true);
   };
 
@@ -92,6 +103,11 @@ export default function AthletesPage({
     setEditValues({
       name: athlete.name ?? "",
       birth: athlete.birth ?? "",
+      heightCm: athlete.heightCm ?? "",
+      weightKg: athlete.weightKg ?? "",
+      club: athlete.club ?? "",
+      courtPosition: athlete.courtPosition ?? "",
+      dominantFoot: athlete.dominantFoot ?? "",
       guardian: athlete.guardian ?? "",
       guardianNotApplicable: Boolean(athlete.guardianNotApplicable),
       phone: athlete.phone ?? "",
@@ -122,10 +138,15 @@ export default function AthletesPage({
       0,
       editingAthlete.allocated - editingAthlete.remaining,
     );
-    const allocated = PLANS[editValues.plan].sessions;
+    const allocated = state.plans[editValues.plan].sessions;
     actions.updateAthlete(editingAthlete.id, {
       name: editValues.name.trim(),
       birth: editValues.birth,
+      heightCm: editValues.heightCm === "" ? null : Number(editValues.heightCm),
+      weightKg: editValues.weightKg === "" ? null : Number(editValues.weightKg),
+      club: editValues.club.trim(),
+      courtPosition: editValues.courtPosition.trim(),
+      dominantFoot: editValues.dominantFoot,
       guardian: editValues.guardianNotApplicable
         ? ""
         : editValues.guardian.trim(),
@@ -257,6 +278,12 @@ export default function AthletesPage({
                   >
                     <td>
                       <span className="athlete-table-name">{a.name}</span>
+                      {(a.recoveryCredits ?? 0) > 0 && (
+                        <span className="athlete-recovery-credit">
+                          {a.recoveryCredits} clase{a.recoveryCredits === 1 ? "" : "s"} recuperativa
+                          {a.recoveryCredits === 1 ? "" : "s"}
+                        </span>
+                      )}
                     </td>
 
                     <td>
@@ -289,7 +316,7 @@ export default function AthletesPage({
 
                     <td>
                       <span className="athlete-plan">
-                        {PLANS[a.plan].label}
+                        {state.plans[a.plan]?.label ?? "Plan no disponible"}
                       </span>
                     </td>
 
@@ -312,24 +339,26 @@ export default function AthletesPage({
                       </button>
                     </td>
 
-                    <td className="text-end">
-                      <div className="athlete-actions">
+                    <td className="athletes-actions-cell">
+                      <div className="plans-row-actions">
                         <button
                           type="button"
-                          className="athlete-status-button"
+                          className="plans-edit-button"
                           onClick={() => openEditModal(a)}
+                          aria-label={`Editar a ${a.name}`}
+                          title="Editar atleta"
                         >
-                          Editar
+                          <EditIcon />
                         </button>
 
                         <button
                           type="button"
-                          className="athlete-delete-button"
+                          className="plans-delete-button"
                           onClick={() => openDeleteModal(a)}
                           aria-label={`Eliminar a ${a.name}`}
                           title="Eliminar atleta"
                         >
-                          ×
+                          <DeleteIcon />
                         </button>
                       </div>
                     </td>
@@ -419,15 +448,87 @@ export default function AthletesPage({
                         >
                           Fecha de nacimiento
                         </label>
-                        <input
+                        <DatePicker
                           id="edit-athlete-birth"
-                          type="date"
-                          className="form-control"
                           value={editValues.birth}
+                          onChange={(birth) => updateEditField("birth", birth)}
+                        />
+                        <div className="athlete-age-preview">
+                          Edad actual: {ageOf(editValues.birth)}
+                          {editValues.birth && ageOf(editValues.birth) !== "-" ? " años" : ""}
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label" htmlFor="edit-athlete-height">
+                          Estatura (cm)
+                        </label>
+                        <input
+                          id="edit-athlete-height"
+                          className="form-control"
+                          type="number"
+                          min="1"
+                          step="any"
+                          value={editValues.heightCm}
+                          onChange={(event) => updateEditField("heightCm", event.target.value)}
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label" htmlFor="edit-athlete-weight">
+                          Peso (kg)
+                        </label>
+                        <input
+                          id="edit-athlete-weight"
+                          className="form-control"
+                          type="number"
+                          min="1"
+                          step="any"
+                          value={editValues.weightKg}
+                          onChange={(event) => updateEditField("weightKg", event.target.value)}
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label" htmlFor="edit-athlete-club">
+                          Club o equipo actual
+                        </label>
+                        <input
+                          id="edit-athlete-club"
+                          className="form-control"
+                          maxLength={80}
+                          value={editValues.club}
+                          onChange={(event) => updateEditField("club", event.target.value)}
+                        />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label" htmlFor="edit-athlete-position">
+                          Posición en cancha
+                        </label>
+                        <input
+                          id="edit-athlete-position"
+                          className="form-control"
+                          maxLength={60}
+                          value={editValues.courtPosition}
                           onChange={(event) =>
-                            updateEditField("birth", event.target.value)
+                            updateEditField("courtPosition", event.target.value)
                           }
                         />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label" htmlFor="edit-athlete-foot">
+                          Pie dominante
+                        </label>
+                        <select
+                          id="edit-athlete-foot"
+                          className="form-select"
+                          value={editValues.dominantFoot}
+                          onChange={(event) =>
+                            updateEditField("dominantFoot", event.target.value)
+                          }
+                        >
+                          <option value="">Sin especificar</option>
+                          <option value="Diestro">Diestro</option>
+                          <option value="Zurdo">Zurdo</option>
+                          <option value="Ambidextro">Ambidextro</option>
+                        </select>
                       </div>
                       <div className="col-md-6">
                         <label
@@ -444,7 +545,7 @@ export default function AthletesPage({
                             updateEditField("plan", event.target.value)
                           }
                         >
-                          {Object.entries(PLANS).map(([key, plan]) => (
+                          {Object.entries(state.plans).map(([key, plan]) => (
                             <option key={key} value={key}>
                               {plan.label}
                             </option>
@@ -610,18 +711,72 @@ export default function AthletesPage({
                           Fecha de nacimiento
                         </label>
 
-                        <input
-                          type="date"
-                          className="form-control"
-                          {...bind("birth")}
+                        <DatePicker
+                          id="new-athlete-birth"
+                          value={values.birth}
+                          onChange={(birth) => setField("birth", birth)}
                         />
+                        <div className="athlete-age-preview">
+                          Edad actual: {ageOf(values.birth)}
+                          {values.birth && ageOf(values.birth) !== "-" ? " años" : ""}
+                        </div>
+                      </div>
+
+                      <div className="col-md-6">
+                        <label className="form-label">Estatura (cm)</label>
+                        <input
+                          className="form-control"
+                          type="number"
+                          min="1"
+                          step="any"
+                          {...bind("heightCm")}
+                        />
+                      </div>
+
+                      <div className="col-md-6">
+                        <label className="form-label">Peso (kg)</label>
+                        <input
+                          className="form-control"
+                          type="number"
+                          min="1"
+                          step="any"
+                          {...bind("weightKg")}
+                        />
+                      </div>
+
+                      <div className="col-md-6">
+                        <label className="form-label">Club o equipo actual</label>
+                        <input
+                          className="form-control"
+                          maxLength={80}
+                          {...bind("club")}
+                        />
+                      </div>
+
+                      <div className="col-md-6">
+                        <label className="form-label">Posición en cancha</label>
+                        <input
+                          className="form-control"
+                          maxLength={60}
+                          {...bind("courtPosition")}
+                        />
+                      </div>
+
+                      <div className="col-md-6">
+                        <label className="form-label">Pie dominante</label>
+                        <select className="form-select" {...bind("dominantFoot")}>
+                          <option value="">Sin especificar</option>
+                          <option value="Diestro">Diestro</option>
+                          <option value="Zurdo">Zurdo</option>
+                          <option value="Ambidextro">Ambidextro</option>
+                        </select>
                       </div>
 
                       <div className="col-md-6">
                         <label className="form-label">Plan</label>
 
                         <select className="form-select" {...bind("plan")}>
-                          {Object.entries(PLANS).map(([k, p]) => (
+                          {Object.entries(state.plans).map(([k, p]) => (
                             <option key={k} value={k}>
                               {p.label}
                             </option>

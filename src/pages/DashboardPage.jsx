@@ -1,9 +1,9 @@
 import { lazy, Suspense, useState } from "react";
 import { useApp } from "../context/AppContext";
 import { PageHeader, StatCard } from "../components/UI";
-import { PLANS } from "../utils/constants";
 import { dashboardMetrics, isActive, todayISO } from "../utils/helpers";
 import { getPaymentDetails, summarizePayments } from "../utils/payments";
+import { getClosedAbsenceNotes } from "../utils/attendanceSummary";
 
 const DashboardCharts = lazy(() => import("../components/DashboardCharts"));
 
@@ -80,10 +80,11 @@ export default function DashboardPage({ onViewPendingPayments }) {
     activeAthletes,
     state.sessions,
     currentMonth,
+    state.plans,
   );
   const allCharges = activeAthletes.flatMap(
     (athlete) =>
-      getPaymentDetails(athlete, state.sessions, currentMonth).charges,
+      getPaymentDetails(athlete, state.sessions, currentMonth, state.plans).charges,
   );
   const paidCharges = allCharges.filter((charge) => charge.paid).length;
   const collectionRate = allCharges.length
@@ -99,6 +100,7 @@ export default function DashboardPage({ onViewPendingPayments }) {
         athlete,
         state.sessions,
         currentMonth,
+        state.plans,
       ).charges;
       const pending = charges.filter((charge) => !charge.paid);
       return {
@@ -124,6 +126,14 @@ export default function DashboardPage({ onViewPendingPayments }) {
     ["Sesiones registradas", monthSessionCount],
     ["Saldo por cobrar", formatCurrency(payments.pendingAmount)],
   ];
+  const absenceCycleNotes = state.athletes.flatMap((athlete) =>
+    getClosedAbsenceNotes(
+      athlete,
+      state.sessions,
+      state.plans,
+      currentMonth,
+    ).map((note) => ({ ...note, athleteName: athlete.name })),
+  );
 
   return (
     <div className="dashboard-page">
@@ -135,7 +145,6 @@ export default function DashboardPage({ onViewPendingPayments }) {
           </div>
         ))}
       </div>
-
       <Suspense
         fallback={
           <div className="dashboard-charts-loading" aria-live="polite">
@@ -181,7 +190,7 @@ export default function DashboardPage({ onViewPendingPayments }) {
                 pendingAthletes.slice(0, 8).map((athlete) => (
                   <tr key={athlete.id}>
                     <td>{athlete.name}</td>
-                    <td>{PLANS[athlete.plan].label}</td>
+                    <td>{state.plans[athlete.plan]?.label ?? "Plan no disponible"}</td>
                     <td>{athlete.chargeCount}</td>
                     <td className="text-end">
                       {formatCurrency(athlete.amount)}

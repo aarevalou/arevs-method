@@ -5,9 +5,12 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite --port 5174 --strictPort\" \"wait-on http://localhost:5174 && electron . --dev\"",
-    "start": "vite build && electron ."
+    "start": "vite build --outDir release/renderer && electron .",
+    "build:desktop": "vite build --outDir release/renderer",
+    "dist:win": "npm run build:desktop && electron-builder --win nsis --publish never"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "bootstrap": "^5.3.3",
     "bootswatch": "^5.3.3",
     "react": "^18.3.1",
@@ -18,7 +21,41 @@
     "@vitejs/plugin-react": "^4.3.1",
     "concurrently": "^8.2.2",
     "electron": "^31.0.0",
+    "electron-builder": "^26.15.3",
     "vite": "^5.4.0",
     "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.arevs.method",
+    "productName": "Arevs Method",
+    "electronDist": "node_modules/electron/dist",
+    "directories": {
+      "output": "release/installers"
+    },
+    "files": [
+      "electron/**/*",
+      "release/renderer/**/*",
+      "src/assets/logo.png",
+      "src/assets/logo.ico",
+      "package.json"
+    ],
+    "win": {
+      "icon": "src/assets/logo.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "Arevs-Method-Setup-${version}-${arch}.${ext}"
+    }
   }
 }

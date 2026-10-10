@@ -3,6 +3,7 @@ import { useState } from 'react'
 export const useForm = (initial) => {
   const [values, setValues] = useState(initial)
   const bind = (key) => ({ value: values[key], onChange: (e) => setValues((v) => ({ ...v, [key]: e.target.value })) })
+  const setField = (key, value) => setValues((current) => ({ ...current, [key]: value }))
   const reset = (keep = {}) => setValues({ ...initial, ...keep })
-  return { values, bind, reset }
+  return { values, bind, reset, setField }
 }
